@@ -1,40 +1,50 @@
-name: Deploy Snowflake Schema Change
+name: Snowflake Schema Change Deployment
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
-  deploy:
+  schemachange-deploy:
     runs-on: ubuntu-latest
 
-    env:
-      # Snowflake connection details (from GitHub Secrets)
-      SNOWFLAKE_ACCOUNT: ${{ secrets.DEMO_ACCOUNT }}
-      SNOWFLAKE_USER: ${{ secrets.DEMO_USER }}
-      SNOWFLAKE_PRIVATE_KEY: ${{ secrets.DEMO_PRIVATE_KEY }}
-      SNOWFLAKE_AUTHENTICATOR: snowflake_jwt
-      SNOWFLAKE_ROLE: ${{ secrets.DEMO_ROLE }}
-      SNOWFLAKE_WAREHOUSE: ${{ secrets.DEMO_WAREHOUSE }}
-
-      # Variable passed to schemachange (used in SQL)
-      DATABASE_NAME: ${{ secrets.DEMO_DB }}
-
     steps:
+      # 1️⃣ Checkout repository
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
+      # 2️⃣ Set up Python
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
+      # 3️⃣ Install schemachange
       - name: Install schemachange
         run: |
+          pip install --upgrade pip
           pip install schemachange
 
-      - name: Run schemachange
+      # 4️⃣ Write Snowflake private key to file (CRITICAL STEP)
+      - name: Write private key to file
+        run: |
+          echo "${{ secrets.DEMO_PRIVATE_KEY }}" > snowflake_key.p8
+          chmod 600 snowflake_key.p8
+
+      # 5️⃣ Run schemachange
+      - name: Run schemachange deploy
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.DEMO_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.DEMO_USER }}
+          SNOWFLAKE_ROLE: ${{ secrets.DEMO_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.DEMO_WAREHOUSE }}
+          SNOWFLAKE_AUTHENTICATOR: snowflake_jwt
+          SNOWFLAKE_PRIVATE_KEY_FILE: snowflake_key.p8
         run: |
           schemachange deploy \
-            --vars "{\"database_name\":\"$DATABASE_NAME\"}"
+            --root-folder migrations \
+            --create-change-history-table \
+            --vars '{"database_name":"DEMO"}'
+
