@@ -45,6 +45,8 @@ jobs:
         run: |
           schemachange deploy \
             --root-folder migrations \
+            --change-history-table DEMO.SCHEMACHANGE.CHANGE_HISTORY \
             --create-change-history-table \
             --vars '{"database_name":"DEMO"}'
+ 
 
